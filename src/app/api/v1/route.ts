@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authenticateApiRequest, jsonError } from "@/lib/api-auth";
 
 export async function GET(request: NextRequest) {
+  const auth = await authenticateApiRequest(request);
+  if ("error" in auth) return jsonError(auth.error, auth.status);
+
   const base = `${request.nextUrl.origin}/api/v1`;
   const token = request.nextUrl.searchParams.get("token") || "<TOKEN>";
 
