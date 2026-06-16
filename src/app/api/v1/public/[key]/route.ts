@@ -110,13 +110,55 @@ export async function GET(
     }
   }
 
-  return NextResponse.json({
-    profile,
-    portfolio: {
-      cash,
-      holdings: Object.values(holdings).filter((h) => h.quantity > 0),
-      total_transactions: allTransactions.length,
-    },
-    note: "Sono un privato. Analizza dati e pro/contro senza dare raccomandazioni da professionista regolamentato.",
+  const activeHoldings = Object.values(holdings).filter((h) => h.quantity > 0);
+
+  // Build plain text for AI chatbot browsing tools
+  const lines: string[] = [];
+  lines.push("=== PROFILO FINANZIARIO PERSONALE ===");
+  lines.push(`Data aggiornamento: ${new Date().toISOString().slice(0, 10)}`);
+  lines.push("");
+  lines.push(`Nome: ${profile.owner.name}`);
+  lines.push(`Anno nascita: ${profile.owner.birth_year}`);
+  lines.push(`Località: ${profile.owner.location}`);
+  lines.push(`Occupazione: ${profile.owner.occupation}`);
+  lines.push("");
+
+  lines.push("--- CONTI ---");
+  for (const acc of profile.accounts) {
+    lines.push(`• ${acc.name} (${acc.type}): ${acc.role}`);
+  }
+  lines.push("");
+
+  lines.push("--- STRATEGIA (4 Pilastri - Paolo Coletti) ---");
+  for (const p of profile.strategy.pillars) {
+    lines.push(`${p.id} ${p.name} [${p.status}]: ${p.description}`);
+  }
+  lines.push("");
+
+  lines.push("--- FILOSOFIA ---");
+  lines.push(`ETF: ${profile.philosophy.etf}`);
+  lines.push(`Crypto: ${profile.philosophy.crypto}`);
+  lines.push(`EM overweight: ${profile.philosophy.em_overweight}`);
+  lines.push("");
+
+  lines.push("--- SALDI CASH PER CONTO ---");
+  for (const [name, amount] of Object.entries(cash)) {
+    lines.push(`• ${name}: €${(amount as number).toFixed(2)}`);
+  }
+  lines.push("");
+
+  lines.push(`--- POSIZIONI APERTE (${activeHoldings.length}) ---`);
+  for (const h of activeHoldings) {
+    const avgPrice = h.quantity > 0 ? (h.totalCost / h.quantity).toFixed(2) : "0";
+    lines.push(`• ${h.ticker} (${h.type}): ${h.quantity} unità, costo medio €${avgPrice}, costo totale €${h.totalCost.toFixed(2)}`);
+  }
+  lines.push("");
+
+  lines.push(`Totale transazioni elaborate: ${allTransactions.length}`);
+  lines.push("");
+  lines.push("NOTA: Sono un privato. Analizza dati e pro/contro senza dare raccomandazioni da professionista regolamentato.");
+
+  return new Response(lines.join("\n"), {
+    headers: { "Content-Type": "text/plain; charset=utf-8" },
   });
 }
