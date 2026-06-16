@@ -6,26 +6,24 @@ type AuthResult =
   | { userId: string };
 
 export async function authenticateApiRequest(request: NextRequest): Promise<AuthResult> {
+  // Support both: Authorization header OR ?token= query param
   const authHeader = request.headers.get("authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
-    return { error: "Missing or invalid Authorization header", status: 401 };
+  const queryToken = request.nextUrl.searchParams.get("token");
+
+  let token: string | null = null;
+
+  if (authHeader?.startsWith("Bearer ")) {
+    token = authHeader.slice(7);
+  } else if (queryToken) {
+    token = queryToken;
   }
 
-  const token = authHeader.slice(7);
+  if (!token) {
+    return { error: "Missing authentication: use Authorization header or ?token= param", status: 401 };
+  }
 
   const supabase = createServiceClient();
 
-  // Find token by checking hash
-  const { data: tokens } = await supabase
-    .from("api_tokens")
-    .select("id, user_id, name");
-
-  if (!tokens || tokens.length === 0) {
-    return { error: "Invalid token", status: 401 };
-  }
-
-  // Simple token comparison (in production use bcrypt)
-  // For now we store plain tokens hashed with a simple check
   const { data: matchedToken } = await supabase
     .from("api_tokens")
     .select("id, user_id")
