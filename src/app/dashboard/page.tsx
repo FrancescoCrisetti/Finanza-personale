@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { SyncGistButton } from "./sync-gist-button";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -16,7 +17,10 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-bold">Dashboard</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <SyncGistButton />
+      </div>
 
       {/* Accounts */}
       <section>

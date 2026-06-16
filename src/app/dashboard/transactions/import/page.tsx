@@ -206,7 +206,10 @@ export default function ImportCSVPage() {
     const parts = [`${inserted} nuove transazioni importate`];
     if (skipped > 0) parts.push(`${skipped} già presenti (saltate)`);
     setResult(parts.join(". ") + ".");
+
     if (inserted > 0) {
+      // Sync Gist in background
+      fetch("/api/sync-gist", { method: "POST" }).catch(() => {});
       setTimeout(() => router.push("/dashboard/transactions"), 2000);
     }
     setImporting(false);
