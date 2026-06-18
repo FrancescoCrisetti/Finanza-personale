@@ -15,6 +15,15 @@ const NAV_ITEMS = [
     ),
   },
   {
+    href: "/chat",
+    label: "Consulente AI",
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4-.83l-5 .83 1.5-3.5C2.55 15.05 2 13.58 2 12c0-4.418 4.03-8 9-8s10 3.582 10 8z" />
+      </svg>
+    ),
+  },
+  {
     href: "/dashboard/transactions",
     label: "Transazioni",
     icon: (
