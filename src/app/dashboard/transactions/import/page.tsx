@@ -208,8 +208,6 @@ export default function ImportCSVPage() {
     setResult(parts.join(". ") + ".");
 
     if (inserted > 0) {
-      // Sync Gist in background
-      fetch("/api/sync-gist", { method: "POST" }).catch(() => {});
       setTimeout(() => router.push("/dashboard/transactions"), 2000);
     }
     setImporting(false);

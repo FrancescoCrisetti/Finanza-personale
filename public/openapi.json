@@ -1,0 +1,647 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Finanza Personale API",
+    "description": "API REST per leggere profilo, strategia, snapshot del portafoglio e transazioni di un tracker di finanza personale. Pensata per agenti AI: chiama prima /profile per il contesto, poi /summary per i saldi e le posizioni, infine /transactions per i dettagli.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://finanza-personale-cris.vercel.app/api/v1",
+      "description": "Produzione"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/profile": {
+      "get": {
+        "operationId": "getProfile",
+        "summary": "Profilo, conti e strategia dell'utente",
+        "description": "Profilo utente, conti, strategia di investimento (4 pilastri), filosofia e configurazione PAC. Chiamalo per primo per capire chi è l'utente e quali sono i suoi obiettivi.",
+        "responses": {
+          "200": {
+            "description": "Profilo utente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "owner": {
+                      "type": "object",
+                      "properties": {
+                        "name": { "type": "string" },
+                        "birth_year": { "type": "integer" },
+                        "location": { "type": "string" },
+                        "occupation": { "type": "string" }
+                      }
+                    },
+                    "accounts": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Account" }
+                    },
+                    "strategy": {
+                      "type": "object",
+                      "properties": {
+                        "inspiration": { "type": "string" },
+                        "pillars": {
+                          "type": "array",
+                          "items": { "$ref": "#/components/schemas/Pillar" }
+                        }
+                      }
+                    },
+                    "philosophy": {
+                      "type": "object",
+                      "properties": {
+                        "etf": { "type": "string" },
+                        "crypto": { "type": "string" },
+                        "em_overweight": { "type": "string" },
+                        "pillar3_trigger": { "type": "string" }
+                      }
+                    },
+                    "pac_schedule": {
+                      "type": "object",
+                      "properties": {
+                        "frequency": { "type": "string" },
+                        "timing": { "type": "string" },
+                        "platform": { "type": "string" },
+                        "assets": {
+                          "type": "array",
+                          "items": { "type": "string" }
+                        }
+                      }
+                    },
+                    "notes": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/summary": {
+      "get": {
+        "operationId": "getSummary",
+        "summary": "Snapshot del portafoglio",
+        "description": "Saldo cash per ogni conto e posizioni correnti (ticker, tipo, quantità, costo totale). Include il numero totale di transazioni.",
+        "responses": {
+          "200": {
+            "description": "Snapshot del portafoglio",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cash": {
+                      "type": "object",
+                      "additionalProperties": { "type": "number" },
+                      "description": "Saldo cash in EUR per nome conto"
+                    },
+                    "holdings": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Holding" }
+                    },
+                    "total_transactions": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/transactions": {
+      "get": {
+        "operationId": "getTransactions",
+        "summary": "Lista transazioni paginata",
+        "description": "Lista transazioni ordinata dalla più recente. Filtrabile per tipo, per conto e per intervallo di date (from/to, usabili anche singolarmente).",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Risultati per pagina (max 1000).",
+            "required": false,
+            "schema": { "type": "integer", "default": 100, "maximum": 1000 }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Offset per la paginazione.",
+            "required": false,
+            "schema": { "type": "integer", "default": 0 }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "description": "Filtra per tipo di transazione.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "BUY",
+                "SELL",
+                "DEPOSIT",
+                "WITHDRAW",
+                "EXPENSE",
+                "INCOME",
+                "TRANSFER_IN",
+                "TRANSFER_OUT",
+                "FEE",
+                "DIVIDEND"
+              ]
+            }
+          },
+          {
+            "name": "account",
+            "in": "query",
+            "description": "Filtra per nome conto (es. Trade Republic, BCC, Revolut, Binance).",
+            "required": false,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "account_id",
+            "in": "query",
+            "description": "Filtra per id (UUID) del conto. Alternativa più precisa a 'account' per nome.",
+            "required": false,
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "Data minima inclusa (formato YYYY-MM-DD). Restituisce le transazioni con date >= from. Può essere usata da sola o insieme a 'to'.",
+            "required": false,
+            "schema": { "type": "string", "format": "date" }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Data massima inclusa (formato YYYY-MM-DD). Restituisce le transazioni con date <= to. Può essere usata da sola o insieme a 'from'.",
+            "required": false,
+            "schema": { "type": "string", "format": "date" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista transazioni",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "transactions": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Transaction" }
+                    },
+                    "count": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/holdings": {
+      "get": {
+        "operationId": "getHoldings",
+        "summary": "Posizioni con valore di mercato e P&L",
+        "description": "Posizioni correnti arricchite con prezzo di mercato (CoinGecko per crypto, Yahoo Finance per ETF), costo medio, valore di mercato, P&L e peso %.",
+        "parameters": [
+          {
+            "name": "refresh",
+            "in": "query",
+            "description": "Imposta a 1 per forzare l'aggiornamento dei prezzi ignorando la cache.",
+            "required": false,
+            "schema": { "type": "string", "enum": ["1"] }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Posizioni con valore di mercato",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "holdings": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "ticker": { "type": "string" },
+                          "name": { "type": "string", "nullable": true },
+                          "type": { "type": "string" },
+                          "asset_class": { "type": "string", "nullable": true },
+                          "quantity": { "type": "number" },
+                          "avg_cost": { "type": "number" },
+                          "total_cost": { "type": "number" },
+                          "current_price": { "type": "number", "nullable": true },
+                          "market_value": { "type": "number", "nullable": true },
+                          "pnl": { "type": "number", "nullable": true },
+                          "pnl_pct": { "type": "number", "nullable": true },
+                          "weight_pct": { "type": "number", "nullable": true },
+                          "priced": { "type": "boolean" }
+                        }
+                      }
+                    },
+                    "total_market_value": { "type": "number" },
+                    "total_cost": { "type": "number" },
+                    "total_pnl": { "type": "number" },
+                    "unpriced": { "type": "array", "items": { "type": "string" } }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/allocation": {
+      "get": {
+        "operationId": "getAllocation",
+        "summary": "Asset allocation",
+        "description": "Ripartizione del portafoglio per classe di attivo, per singola posizione e, se gli asset hanno i tag, per area geografica e settore. Include il cash.",
+        "parameters": [
+          {
+            "name": "refresh",
+            "in": "query",
+            "description": "Imposta a 1 per forzare l'aggiornamento dei prezzi.",
+            "required": false,
+            "schema": { "type": "string", "enum": ["1"] }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Allocation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "total_cash": { "type": "number" },
+                    "by_class": { "type": "array", "items": { "$ref": "#/components/schemas/AllocationSlice" } },
+                    "by_position": { "type": "array", "items": { "$ref": "#/components/schemas/AllocationSlice" } },
+                    "by_region": { "type": "array", "items": { "$ref": "#/components/schemas/AllocationSlice" } },
+                    "by_sector": { "type": "array", "items": { "$ref": "#/components/schemas/AllocationSlice" } }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/networth": {
+      "get": {
+        "operationId": "getNetWorth",
+        "summary": "Patrimonio netto",
+        "description": "Patrimonio netto = valore di mercato investito + cash + asset esterni (immobili, TFR, pensione) - passività/debiti.",
+        "parameters": [
+          {
+            "name": "refresh",
+            "in": "query",
+            "description": "Imposta a 1 per forzare l'aggiornamento dei prezzi.",
+            "required": false,
+            "schema": { "type": "string", "enum": ["1"] }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Patrimonio netto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "net_worth": { "type": "number" },
+                    "total_assets": { "type": "number" },
+                    "total_liabilities": { "type": "number" },
+                    "breakdown": {
+                      "type": "object",
+                      "properties": {
+                        "invested_market_value": { "type": "number" },
+                        "cash": { "type": "number" },
+                        "external_assets": { "type": "number" }
+                      }
+                    },
+                    "cash_by_account": { "type": "object", "additionalProperties": { "type": "number" } }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/cashflow": {
+      "get": {
+        "operationId": "getCashflow",
+        "summary": "Flussi di cassa mensili e tasso di risparmio",
+        "description": "Entrate, uscite, netto e importo investito per mese, con tasso di risparmio. income=INCOME+DIVIDEND+SAVEBACK, expense=EXPENSE+FEE.",
+        "parameters": [
+          {
+            "name": "months",
+            "in": "query",
+            "description": "Limita agli ultimi N mesi.",
+            "required": false,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cash flow",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "monthly": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "month": { "type": "string" },
+                          "income": { "type": "number" },
+                          "expense": { "type": "number" },
+                          "net": { "type": "number" },
+                          "invested": { "type": "number" },
+                          "savingsRate": { "type": "number", "nullable": true }
+                        }
+                      }
+                    },
+                    "totals": {
+                      "type": "object",
+                      "properties": {
+                        "income": { "type": "number" },
+                        "expense": { "type": "number" },
+                        "net": { "type": "number" },
+                        "invested": { "type": "number" },
+                        "savingsRate": { "type": "number", "nullable": true }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/performance": {
+      "get": {
+        "operationId": "getPerformance",
+        "summary": "Performance e XIRR",
+        "description": "Rendimento annualizzato ponderato per i flussi (XIRR) complessivo e per asset, P&L e dividendi totali.",
+        "parameters": [
+          {
+            "name": "refresh",
+            "in": "query",
+            "description": "Imposta a 1 per forzare l'aggiornamento dei prezzi.",
+            "required": false,
+            "schema": { "type": "string", "enum": ["1"] }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Performance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "portfolio": {
+                      "type": "object",
+                      "properties": {
+                        "market_value": { "type": "number" },
+                        "total_cost": { "type": "number" },
+                        "total_pnl": { "type": "number" },
+                        "xirr_pct": { "type": "number", "nullable": true },
+                        "dividends_total": { "type": "number" }
+                      }
+                    },
+                    "by_asset": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "ticker": { "type": "string" },
+                          "market_value": { "type": "number", "nullable": true },
+                          "total_cost": { "type": "number" },
+                          "pnl": { "type": "number", "nullable": true },
+                          "pnl_pct": { "type": "number", "nullable": true },
+                          "xirr_pct": { "type": "number", "nullable": true }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/tax": {
+      "get": {
+        "operationId": "getTax",
+        "summary": "Fiscalità: plus/minusvalenze e zainetto fiscale",
+        "description": "Plus/minusvalenze realizzate per anno (metodo costo medio), dividendi e zainetto fiscale (minusvalenze compensabili a credito). Valori indicativi, non consulenza fiscale.",
+        "responses": {
+          "200": {
+            "description": "Fiscalità",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "by_year": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "year": { "type": "integer" },
+                          "realizedGain": { "type": "number" },
+                          "realizedLoss": { "type": "number" },
+                          "net": { "type": "number" },
+                          "dividends": { "type": "number" }
+                        }
+                      }
+                    },
+                    "tax_shield": {
+                      "type": "object",
+                      "properties": {
+                        "total_available": { "type": "number" },
+                        "entries": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "year": { "type": "integer" },
+                              "amount_eur": { "type": "number" },
+                              "expires_year": { "type": "integer" },
+                              "expired": { "type": "boolean" }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/strategy": {
+      "get": {
+        "operationId": "getStrategy",
+        "summary": "Strategia attiva dettagliata",
+        "description": "Restituisce la configurazione della versione di strategia attualmente attiva dell'utente.",
+        "responses": {
+          "200": {
+            "description": "Strategia attiva",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "strategy": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "nullable": true
+                    },
+                    "label": { "type": "string" },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Token API passato come header Authorization: Bearer <token>."
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Token mancante o non valido",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" }
+          }
+        }
+      },
+      "ServerError": {
+        "description": "Errore del server",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Account": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "type": {
+            "type": "string",
+            "enum": ["bank", "broker", "exchange"]
+          },
+          "role": { "type": "string" }
+        }
+      },
+      "Pillar": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["active", "not_active"]
+          },
+          "target_eur": { "type": "number" },
+          "description": { "type": "string" }
+        }
+      },
+      "Holding": {
+        "type": "object",
+        "properties": {
+          "ticker": { "type": "string" },
+          "type": {
+            "type": "string",
+            "enum": ["etf", "crypto"]
+          },
+          "quantity": { "type": "number" },
+          "totalCost": { "type": "number" }
+        }
+      },
+      "AllocationSlice": {
+        "type": "object",
+        "properties": {
+          "key": { "type": "string" },
+          "value": { "type": "number" },
+          "weightPct": { "type": "number" }
+        }
+      },
+      "Transaction": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "date": { "type": "string", "format": "date" },
+          "type": { "type": "string" },
+          "quantity": { "type": "number", "nullable": true },
+          "amount_eur": { "type": "number" },
+          "description": { "type": "string" },
+          "category": { "type": "string" },
+          "accounts": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "name": { "type": "string" }
+            }
+          },
+          "assets": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "ticker": { "type": "string" },
+              "type": { "type": "string" }
+            }
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": { "type": "string" },
+          "status": { "type": "integer" }
+        }
+      }
+    }
+  }
+}

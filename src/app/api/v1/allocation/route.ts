@@ -6,6 +6,7 @@ import {
   computeHoldingsAndRealized,
   enrichHoldingsWithPrices,
   computeCashByAccount,
+  computeAllocation,
   round,
 } from "@/lib/analytics";
 
@@ -18,31 +19,21 @@ export async function GET(request: NextRequest) {
 
   const transactions = await fetchAllTransactions(supabase, auth.userId);
   const { holdings } = computeHoldingsAndRealized(transactions);
-  const { holdings: enriched, totalMarketValue } = await enrichHoldingsWithPrices(
-    supabase,
-    auth.userId,
-    holdings,
-    { forceRefresh }
-  );
+  const { holdings: enriched } = await enrichHoldingsWithPrices(supabase, auth.userId, holdings, {
+    forceRefresh,
+  });
 
   const cashByAccount = computeCashByAccount(transactions);
   const totalCash = Object.values(cashByAccount).reduce((s, v) => s + v, 0);
 
+  const allocation = computeAllocation(enriched, totalCash);
+
   return NextResponse.json({
-    cash: Object.fromEntries(Object.entries(cashByAccount).map(([k, v]) => [k, round(v)])),
     total_cash: round(totalCash),
-    holdings: enriched.map((h) => ({
-      ticker: h.ticker,
-      type: h.type,
-      quantity: round(h.quantity, 8),
-      totalCost: round(h.totalCost),
-      market_value: h.marketValue != null ? round(h.marketValue) : null,
-      pnl: h.pnl != null ? round(h.pnl) : null,
-      pnl_pct: h.pnlPct != null ? round(h.pnlPct) : null,
-    })),
-    total_market_value: round(totalMarketValue),
-    total_portfolio_value: round(totalMarketValue + totalCash),
-    total_transactions: transactions.length,
+    by_class: allocation.byClass,
+    by_position: allocation.byPosition,
+    by_region: allocation.byRegion,
+    by_sector: allocation.bySector,
+    note: "by_region e by_sector sono popolati solo per gli asset con tag region/sector impostati.",
   });
 }
-

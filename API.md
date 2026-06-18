@@ -102,6 +102,9 @@ Paginated transaction list, newest first. Use filters to narrow results.
 | `offset` | 0 | Pagination offset |
 | `type` | — | Filter by transaction type |
 | `account` | — | Filter by account name |
+| `account_id` | — | Filter by account id (UUID). More precise alternative to `account` |
+| `from` | — | Min date inclusive (`YYYY-MM-DD`). Usable alone or with `to` |
+| `to` | — | Max date inclusive (`YYYY-MM-DD`). Usable alone or with `from` |
 
 **Transaction Types:**
 
@@ -141,6 +144,100 @@ Paginated transaction list, newest first. Use filters to narrow results.
 
 ---
 
+### GET /api/v1/holdings
+
+Posizioni con valore di mercato attuale, costo medio, P&L e peso %. Prezzi: CoinGecko (crypto) + Yahoo Finance (ETF), con cache 30 min. Usa `?refresh=1` per forzare l'aggiornamento.
+
+```json
+{
+  "holdings": [
+    { "ticker": "string", "name": "string", "type": "etf|crypto", "asset_class": "string|null",
+      "quantity": "number", "avg_cost": "number", "total_cost": "number",
+      "current_price": "number|null", "market_value": "number|null",
+      "pnl": "number|null", "pnl_pct": "number|null", "weight_pct": "number|null", "priced": "boolean" }
+  ],
+  "total_market_value": "number",
+  "total_cost": "number",
+  "total_pnl": "number",
+  "unpriced": ["string"]
+}
+```
+
+---
+
+### GET /api/v1/allocation
+
+Asset allocation per classe, posizione e (se taggati) area geografica e settore. Include il cash. `?refresh=1` per aggiornare i prezzi.
+
+```json
+{
+  "total_cash": "number",
+  "by_class": [{ "key": "string", "value": "number", "weightPct": "number" }],
+  "by_position": [{ "key": "string", "value": "number", "weightPct": "number" }],
+  "by_region": [{ "key": "string", "value": "number", "weightPct": "number" }],
+  "by_sector": [{ "key": "string", "value": "number", "weightPct": "number" }]
+}
+```
+
+---
+
+### GET /api/v1/networth
+
+Patrimonio netto = valore di mercato investito + cash + asset esterni − passività.
+
+```json
+{
+  "net_worth": "number",
+  "total_assets": "number",
+  "total_liabilities": "number",
+  "breakdown": { "invested_market_value": "number", "cash": "number", "external_assets": "number" },
+  "cash_by_account": { "<account>": "number" },
+  "external_assets": [{ "name": "string", "type": "string", "value_eur": "number" }],
+  "liabilities": [{ "name": "string", "type": "string", "amount_eur": "number", "interest_rate": "number|null", "monthly_payment": "number|null" }]
+}
+```
+
+---
+
+### GET /api/v1/cashflow
+
+Flussi di cassa mensili e tasso di risparmio. `?months=N` per gli ultimi N mesi. `income`=INCOME+DIVIDEND+SAVEBACK, `expense`=EXPENSE+FEE, `invested`=BUY−SELL.
+
+```json
+{
+  "monthly": [{ "month": "YYYY-MM", "income": "number", "expense": "number", "net": "number", "invested": "number", "savingsRate": "number|null" }],
+  "totals": { "income": "number", "expense": "number", "net": "number", "invested": "number", "savingsRate": "number|null" }
+}
+```
+
+---
+
+### GET /api/v1/performance
+
+XIRR (rendimento annualizzato money-weighted) complessivo e per asset, P&L e dividendi totali. `?refresh=1` per aggiornare i prezzi.
+
+```json
+{
+  "portfolio": { "market_value": "number", "total_cost": "number", "total_pnl": "number", "xirr_pct": "number|null", "dividends_total": "number" },
+  "by_asset": [{ "ticker": "string", "market_value": "number|null", "total_cost": "number", "pnl": "number|null", "pnl_pct": "number|null", "xirr_pct": "number|null" }]
+}
+```
+
+---
+
+### GET /api/v1/tax
+
+Plus/minusvalenze realizzate per anno (metodo costo medio), dividendi e zainetto fiscale (minusvalenze compensabili, scadenza 4 anni, inserite manualmente). Valori indicativi, non consulenza fiscale.
+
+```json
+{
+  "by_year": [{ "year": "number", "realizedGain": "number", "realizedLoss": "number", "net": "number", "dividends": "number" }],
+  "tax_shield": { "total_available": "number", "entries": [{ "year": "number", "amount_eur": "number", "expires_year": "number", "expired": "boolean" }] }
+}
+```
+
+---
+
 ## Errors
 
 ```json
@@ -156,8 +253,12 @@ Paginated transaction list, newest first. Use filters to narrow results.
 
 ## Workflow for AI agents
 
-1. **Start** → call `/profile` to understand user context, strategy, accounts
-2. **Analyze** → call `/summary` for current balances and positions
-3. **Deep dive** → call `/transactions` with filters when details are needed (e.g. spending analysis, PAC history, income breakdown)
+1. **Start** → call `/profile` for user context, risk profile, goals, accounts
+2. **Net worth** → call `/networth` for the full picture (assets − liabilities)
+3. **Portfolio** → call `/holdings` (market value + P&L) and `/allocation` (diversification)
+4. **Performance** → call `/performance` for XIRR and returns
+5. **Cash flow** → call `/cashflow` for income/expenses and savings rate
+6. **Tax** → call `/tax` for realized gains/losses and tax shield
+7. **Deep dive** → call `/transactions` with filters for granular detail
 
 Use Python `urllib.request` to make calls. Pass the token via `Authorization: Bearer <token>` header.

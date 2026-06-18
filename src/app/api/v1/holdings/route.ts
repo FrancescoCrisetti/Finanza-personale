@@ -5,7 +5,6 @@ import {
   fetchAllTransactions,
   computeHoldingsAndRealized,
   enrichHoldingsWithPrices,
-  computeCashByAccount,
   round,
 } from "@/lib/analytics";
 
@@ -25,24 +24,25 @@ export async function GET(request: NextRequest) {
     { forceRefresh }
   );
 
-  const cashByAccount = computeCashByAccount(transactions);
-  const totalCash = Object.values(cashByAccount).reduce((s, v) => s + v, 0);
-
   return NextResponse.json({
-    cash: Object.fromEntries(Object.entries(cashByAccount).map(([k, v]) => [k, round(v)])),
-    total_cash: round(totalCash),
     holdings: enriched.map((h) => ({
       ticker: h.ticker,
+      name: h.name,
       type: h.type,
+      asset_class: h.asset_class,
       quantity: round(h.quantity, 8),
-      totalCost: round(h.totalCost),
+      avg_cost: round(h.avgCost, 4),
+      total_cost: round(h.totalCost),
+      current_price: h.currentPrice != null ? round(h.currentPrice, 4) : null,
       market_value: h.marketValue != null ? round(h.marketValue) : null,
       pnl: h.pnl != null ? round(h.pnl) : null,
       pnl_pct: h.pnlPct != null ? round(h.pnlPct) : null,
+      weight_pct: h.weightPct != null ? round(h.weightPct) : null,
+      priced: h.priced,
     })),
     total_market_value: round(totalMarketValue),
-    total_portfolio_value: round(totalMarketValue + totalCash),
-    total_transactions: transactions.length,
+    total_cost: round(enriched.reduce((s, h) => s + h.totalCost, 0)),
+    total_pnl: round(enriched.reduce((s, h) => s + (h.pnl || 0), 0)),
+    unpriced: enriched.filter((h) => !h.priced).map((h) => h.ticker),
   });
 }
-

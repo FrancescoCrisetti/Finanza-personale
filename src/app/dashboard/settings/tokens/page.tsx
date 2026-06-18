@@ -17,6 +17,8 @@ export default function ApiTokensPage() {
   const [newTokenName, setNewTokenName] = useState("");
   const [createdToken, setCreatedToken] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState("");
 
   const supabase = createClient();
 
@@ -74,6 +76,25 @@ export default function ApiTokensPage() {
     if (!confirm("Eliminare questo token? L'accesso API con questo token smetterà di funzionare.")) return;
 
     await supabase.from("api_tokens").delete().eq("id", id);
+    fetchTokens();
+  };
+
+  const startEditing = (id: string, currentName: string) => {
+    setEditingId(id);
+    setEditingName(currentName);
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditingName("");
+  };
+
+  const handleRename = async (id: string) => {
+    const name = editingName.trim();
+    if (!name) return;
+
+    await supabase.from("api_tokens").update({ name }).eq("id", id);
+    cancelEditing();
     fetchTokens();
   };
 
@@ -149,8 +170,37 @@ export default function ApiTokensPage() {
           <ul className="divide-y">
             {tokens.map((token) => (
               <li key={token.id} className="px-6 py-4 flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-gray-900">{token.name}</p>
+                <div className="flex-1">
+                  {editingId === token.id ? (
+                    <div className="flex items-center gap-2 mb-1">
+                      <input
+                        type="text"
+                        value={editingName}
+                        onChange={(e) => setEditingName(e.target.value)}
+                        autoFocus
+                        className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleRename(token.id);
+                          if (e.key === "Escape") cancelEditing();
+                        }}
+                      />
+                      <button
+                        onClick={() => handleRename(token.id)}
+                        disabled={!editingName.trim()}
+                        className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                      >
+                        Salva
+                      </button>
+                      <button
+                        onClick={cancelEditing}
+                        className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800"
+                      >
+                        Annulla
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="font-medium text-gray-900">{token.name}</p>
+                  )}
                   <p className="text-sm text-gray-500 font-mono">{maskToken(token.token_hash)}</p>
                   <p className="text-xs text-gray-400 mt-1">
                     Creato: {new Date(token.created_at).toLocaleDateString("it-IT")}
@@ -159,12 +209,22 @@ export default function ApiTokensPage() {
                     )}
                   </p>
                 </div>
-                <button
-                  onClick={() => handleDelete(token.id)}
-                  className="text-red-600 hover:text-red-800 text-sm font-medium"
-                >
-                  Elimina
-                </button>
+                {editingId !== token.id && (
+                  <div className="flex items-center gap-4">
+                    <button
+                      onClick={() => startEditing(token.id, token.name)}
+                      className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                    >
+                      Rinomina
+                    </button>
+                    <button
+                      onClick={() => handleDelete(token.id)}
+                      className="text-red-600 hover:text-red-800 text-sm font-medium"
+                    >
+                      Elimina
+                    </button>
+                  </div>
+                )}
               </li>
             ))}
           </ul>

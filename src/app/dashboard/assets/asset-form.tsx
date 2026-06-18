@@ -10,6 +10,16 @@ const ASSET_TYPES = [
   { value: "fiat", label: "Fiat" },
 ];
 
+const ASSET_CLASSES = [
+  { value: "", label: "—" },
+  { value: "equity", label: "Azionario" },
+  { value: "bond", label: "Obbligazionario" },
+  { value: "crypto", label: "Crypto" },
+  { value: "commodity", label: "Materie prime" },
+  { value: "cash", label: "Liquidità" },
+  { value: "other", label: "Altro" },
+];
+
 export function AssetForm() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -36,6 +46,10 @@ export function AssetForm() {
       name: (form.get("name") as string) || null,
       type: form.get("type") as string,
       isin: (form.get("isin") as string) || null,
+      price_api_id: (form.get("price_api_id") as string) || null,
+      asset_class: (form.get("asset_class") as string) || null,
+      region: (form.get("region") as string) || null,
+      sector: (form.get("sector") as string) || null,
     });
 
     if (insertError) {
@@ -92,6 +106,45 @@ export function AssetForm() {
             type="text"
             name="isin"
             placeholder="Solo per ETF"
+            className="w-full border rounded px-2 py-1.5 text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">ID prezzo</label>
+          <input
+            type="text"
+            name="price_api_id"
+            placeholder="Yahoo (EIMI.MI) o CoinGecko (bitcoin)"
+            className="w-full border rounded px-2 py-1.5 text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Classe</label>
+          <select name="asset_class" className="w-full border rounded px-2 py-1.5 text-sm">
+            {ASSET_CLASSES.map((c) => (
+              <option key={c.value} value={c.value}>{c.label}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Area geografica</label>
+          <input
+            type="text"
+            name="region"
+            placeholder="es. Mercati emergenti"
+            className="w-full border rounded px-2 py-1.5 text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Settore</label>
+          <input
+            type="text"
+            name="sector"
+            placeholder="es. Tecnologia"
             className="w-full border rounded px-2 py-1.5 text-sm"
           />
         </div>
