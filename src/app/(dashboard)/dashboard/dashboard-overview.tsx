@@ -5,8 +5,12 @@ import {
   enrichHoldingsWithPrices,
   computeCashByAccount,
   computeAllocation,
+  computeCashflow,
   computePortfolioXirr,
 } from "@/lib/analytics";
+import { getAlerts } from "@/lib/alerts";
+import { AllocationChart } from "./allocation-chart";
+import { CashflowChart } from "./cashflow-chart";
 
 function eur(n: number): string {
   return n.toLocaleString("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
@@ -30,6 +34,15 @@ const CLASS_COLORS: Record<string, string> = {
   other: "bg-rose-500",
 };
 
+const CLASS_HEX: Record<string, string> = {
+  equity: "#3b82f6",
+  bond: "#10b981",
+  crypto: "#f59e0b",
+  commodity: "#a855f7",
+  cash: "#9ca3af",
+  other: "#f43f5e",
+};
+
 export async function DashboardOverview({ userId }: { userId: string }) {
   const supabase = createServiceClient();
 
@@ -43,6 +56,7 @@ export async function DashboardOverview({ userId }: { userId: string }) {
 
   const { holdings } = computeHoldingsAndRealized(transactions);
   const { holdings: enriched, totalMarketValue } = await enrichHoldingsWithPrices(supabase, userId, holdings);
+  const alerts = await getAlerts(supabase, userId);
 
   const cashByAccount = computeCashByAccount(transactions);
   const totalCash = Object.values(cashByAccount).reduce((s, v) => s + v, 0);
@@ -59,6 +73,7 @@ export async function DashboardOverview({ userId }: { userId: string }) {
 
   const xirr = computePortfolioXirr(transactions, totalMarketValue);
   const allocation = computeAllocation(enriched, totalCash);
+  const cashflowMonthly = computeCashflow(transactions).monthly.slice(-6);
 
   const cards = [
     { label: "Patrimonio netto", value: eur(netWorth), sub: liabilitiesTotal > 0 ? `incl. -${eur(liabilitiesTotal)} debiti` : "" },
@@ -79,6 +94,17 @@ export async function DashboardOverview({ userId }: { userId: string }) {
 
   return (
     <section className="space-y-4">
+      {alerts.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-1.5">
+          <div className="text-sm font-semibold text-amber-800">Alert ({alerts.length})</div>
+          <ul className="text-sm text-amber-700 space-y-1">
+            {alerts.map((a, i) => (
+              <li key={i}>{a.message}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {cards.map((c) => (
           <div key={c.label} className="bg-white rounded-lg border p-4">
@@ -98,24 +124,32 @@ export async function DashboardOverview({ userId }: { userId: string }) {
       {allocation.byClass.length > 0 && (
         <div className="bg-white rounded-lg border p-4">
           <div className="text-sm font-semibold mb-3">Allocazione per classe</div>
-          <div className="flex h-3 rounded-full overflow-hidden mb-3">
-            {allocation.byClass.map((s) => (
-              <div
-                key={s.key}
-                className={CLASS_COLORS[s.key] || "bg-gray-300"}
-                style={{ width: `${s.weightPct}%` }}
-                title={`${CLASS_LABELS[s.key] || s.key}: ${s.weightPct}%`}
-              />
-            ))}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+            <AllocationChart
+              slices={allocation.byClass.map((s) => ({
+                key: s.key,
+                label: CLASS_LABELS[s.key] || s.key,
+                value: s.value,
+                weightPct: s.weightPct,
+                color: CLASS_HEX[s.key] || "#d1d5db",
+              }))}
+            />
+            <div className="flex flex-wrap gap-x-4 gap-y-1.5 content-start">
+              {allocation.byClass.map((s) => (
+                <div key={s.key} className="flex items-center gap-1.5 text-xs text-gray-600">
+                  <span className={`w-2.5 h-2.5 rounded-sm ${CLASS_COLORS[s.key] || "bg-gray-300"}`} />
+                  {CLASS_LABELS[s.key] || s.key} · {s.weightPct}%
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="flex flex-wrap gap-x-4 gap-y-1">
-            {allocation.byClass.map((s) => (
-              <div key={s.key} className="flex items-center gap-1.5 text-xs text-gray-600">
-                <span className={`w-2.5 h-2.5 rounded-sm ${CLASS_COLORS[s.key] || "bg-gray-300"}`} />
-                {CLASS_LABELS[s.key] || s.key} · {s.weightPct}%
-              </div>
-            ))}
-          </div>
+        </div>
+      )}
+
+      {cashflowMonthly.length > 0 && (
+        <div className="bg-white rounded-lg border p-4">
+          <div className="text-sm font-semibold mb-3">Cashflow mensile (ultimi {cashflowMonthly.length} mesi)</div>
+          <CashflowChart data={cashflowMonthly} />
         </div>
       )}
     </section>

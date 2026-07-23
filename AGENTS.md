@@ -12,15 +12,14 @@ Personal finance tracker. Imports CSV bank/broker exports, stores in Supabase, e
 npm run dev      # Dev server on :3000
 npm run build    # Production build
 npm run lint     # TypeScript + ESLint
+npm run test     # Vitest - unit test per i parser CSV
 ```
-
-No test runner configured.
 
 ## Architecture
 
 ```
 src/app/api/v1/       → REST API (Bearer token auth via api-auth.ts)
-src/app/dashboard/    → UI pages (Supabase session auth via middleware.ts)
+src/app/(dashboard)/  → UI pages, route group (no URL segment): /dashboard, /transactions, /accounts, /assets, /investments, /settings/* (Supabase session auth via middleware.ts)
 src/lib/parsers/      → CSV parsers (one per bank/broker)
 src/lib/supabase/     → DB clients (client.ts=browser, server.ts=SSR, service.ts=API)
 supabase/migrations/  → SQL schema

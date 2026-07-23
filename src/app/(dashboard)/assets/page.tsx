@@ -7,7 +7,7 @@ export default async function AssetsPage() {
 
   const { data: assets } = await supabase
     .from("assets")
-    .select("*")
+    .select("*, asset_prices(price_eur,native_price,native_currency,source,updated_at)")
     .order("type")
     .order("ticker");
 

@@ -83,6 +83,12 @@ export async function GET(request: NextRequest) {
         description: "Configurazione della strategia di investimento attiva.",
         url: `${base}/strategy?token=${token}`,
       },
+      {
+        path: "/api/v1/alerts",
+        method: "GET",
+        description: "Alert attivi: soglie di prezzo per asset, prezzi non aggiornati da oltre 3 giorni, deviazione dall'allocazione target (se configurata).",
+        url: `${base}/alerts?token=${token}`,
+      },
     ],
     transaction_types: {
       "BUY": "+asset, -cash — Acquisto ETF/crypto",

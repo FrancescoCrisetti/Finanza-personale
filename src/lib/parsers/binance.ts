@@ -8,6 +8,11 @@ interface BinanceRow {
   comment: string;
 }
 
+interface ParsedBinanceTime {
+  dateIso: string;
+  minuteKey: string;
+}
+
 export interface ParsedTransaction {
   date: string; // ISO date YYYY-MM-DD
   type: "BUY" | "DEPOSIT" | "FEE" | "INCOME";
@@ -21,11 +26,30 @@ export interface ParsedTransaction {
   notes: string | null;
 }
 
-function parseDate(binanceDate: string): string {
-  // Format: "24-12-23 13:02:55" → "2024-12-23"
-  const [datePart] = binanceDate.split(" ");
-  const [yy, mm, dd] = datePart.split("-");
-  return `20${yy}-${mm}-${dd}`;
+function parseBinanceTime(raw: string): ParsedBinanceTime {
+  const [datePart = "", timePart = ""] = raw.trim().split(/\s+/);
+  const [a = "", b = "", c = ""] = datePart.split("-");
+  const [hh = "00", mi = "00"] = timePart.split(":");
+
+  let year = "";
+  let month = "";
+  let day = "";
+
+  // Binance exports have been seen in both YY-MM-DD and YYYY-MM-DD.
+  if (a.length === 4) {
+    year = a;
+    month = b;
+    day = c;
+  } else {
+    year = `20${a}`;
+    month = b;
+    day = c;
+  }
+
+  const dateIso = `${year}-${month}-${day}`;
+  const minuteKey = `${year}${month}${day}${hh}${mi}`;
+
+  return { dateIso, minuteKey };
 }
 
 function parseBinanceCSV(csvText: string): BinanceRow[] {
@@ -56,8 +80,8 @@ export function parseBinanceTransactions(csvText: string): ParsedTransaction[] {
   // Group by timestamp truncated to minute (Binance splits paired rows by 1s)
   const groups = new Map<string, BinanceRow[]>();
   for (const row of spotRows) {
-    // "25-01-23 00:53:11" → "25-01-23 00:53"
-    const key = row.time.slice(0, 14);
+    const { minuteKey } = parseBinanceTime(row.time);
+    const key = minuteKey;
     const existing = groups.get(key) || [];
     existing.push(row);
     groups.set(key, existing);
@@ -65,9 +89,10 @@ export function parseBinanceTransactions(csvText: string): ParsedTransaction[] {
 
   const transactions: ParsedTransaction[] = [];
 
-  for (const [time, group] of groups) {
-    const date = parseDate(time);
-    const sourcePrefix = `binance_${time.replace(/[: -]/g, "")}`;
+  for (const [minuteKey, group] of groups) {
+    const { dateIso } = parseBinanceTime(group[0]?.time || "");
+    const date = dateIso;
+    const sourcePrefix = `binance_${minuteKey}`;
 
     // --- DEPOSITS ---
     const deposits = group.filter(

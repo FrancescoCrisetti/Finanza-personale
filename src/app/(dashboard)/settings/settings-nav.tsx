@@ -4,13 +4,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const TABS = [
-  { href: "/dashboard/settings/profile", label: "Profilo" },
-  { href: "/dashboard/settings/goals", label: "Obiettivi" },
-  { href: "/dashboard/settings/liabilities", label: "Passività" },
-  { href: "/dashboard/settings/external-assets", label: "Asset esterni" },
-  { href: "/dashboard/settings/tax", label: "Fiscalità" },
-  { href: "/dashboard/settings/strategy", label: "Strategia" },
-  { href: "/dashboard/settings/tokens", label: "Token API" },
+  { href: "/settings/profile", label: "Profilo" },
+  { href: "/settings/goals", label: "Obiettivi" },
+  { href: "/settings/liabilities", label: "Passività" },
+  { href: "/settings/external-assets", label: "Asset esterni" },
+  { href: "/settings/tax", label: "Fiscalità" },
+  { href: "/settings/strategy", label: "Strategia" },
+  { href: "/settings/allocation-targets", label: "Allocazione target" },
+  { href: "/settings/tokens", label: "Token API" },
+  { href: "/settings/diagnostics", label: "Diagnostica" },
 ];
 
 export function SettingsNav() {

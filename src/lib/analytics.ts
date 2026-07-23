@@ -291,16 +291,32 @@ export function xirr(flows: CashFlow[], guess = 0.1): number | null {
   const hasNeg = flows.some((f) => f.amount < 0);
   if (!hasPos || !hasNeg) return null;
 
-  const t0 = flows[0].date.getTime();
+  const sorted = [...flows].sort((a, b) => a.date.getTime() - b.date.getTime());
+
+  const t0 = sorted[0].date.getTime();
   const years = (d: Date) => (d.getTime() - t0) / (365 * 24 * 3600 * 1000);
 
   const npv = (rate: number) =>
-    flows.reduce((s, f) => s + f.amount / Math.pow(1 + rate, years(f.date)), 0);
+    sorted.reduce((s, f) => s + f.amount / Math.pow(1 + rate, years(f.date)), 0);
   const dnpv = (rate: number) =>
-    flows.reduce((s, f) => {
+    sorted.reduce((s, f) => {
       const t = years(f.date);
       return s - (t * f.amount) / Math.pow(1 + rate, t + 1);
     }, 0);
+
+  // Find a valid bracket [low, high] where NPV changes sign.
+  // If no sign change exists, XIRR is not well-defined for these flows.
+  const low = -0.9999;
+  let high = 1;
+  let fLow = npv(low);
+  let fHigh = npv(high);
+
+  while (fLow * fHigh > 0 && high < 1e6) {
+    high *= 2;
+    fHigh = npv(high);
+  }
+
+  if (!isFinite(fLow) || !isFinite(fHigh) || fLow * fHigh > 0) return null;
 
   let rate = guess;
   for (let i = 0; i < 100; i++) {
@@ -312,7 +328,28 @@ export function xirr(flows: CashFlow[], guess = 0.1): number | null {
     if (Math.abs(next - rate) < 1e-7) return next;
     rate = next;
   }
-  return isFinite(rate) && rate > -0.9999 ? rate : null;
+
+  // Fallback to bisection inside the valid bracket for stability.
+  let left = low;
+  let right = high;
+  let fLeft = npv(left);
+
+  for (let i = 0; i < 120; i++) {
+    const mid = (left + right) / 2;
+    const fMid = npv(mid);
+    if (!isFinite(fMid)) return null;
+    if (Math.abs(fMid) < 1e-8 || Math.abs(right - left) < 1e-8) return mid;
+
+    if (fLeft * fMid <= 0) {
+      right = mid;
+    } else {
+      left = mid;
+      fLeft = fMid;
+    }
+  }
+
+  const result = (left + right) / 2;
+  return isFinite(result) && result > -0.9999 ? result : null;
 }
 
 // Flussi per XIRR del portafoglio investito (BUY out, SELL/DIVIDEND in + valore attuale).
@@ -392,8 +429,9 @@ export function computeAllocation(
   byRegion: AllocationSlice[];
   bySector: AllocationSlice[];
 } {
-  const pricedHoldings = holdings.filter((h) => h.marketValue != null);
-  const total = pricedHoldings.reduce((s, h) => s + (h.marketValue || 0), 0) + cash;
+  const activeHoldings = holdings.filter((h) => h.quantity > 0);
+  const valueForAllocation = (h: Holding) => (h.marketValue != null ? h.marketValue : h.totalCost);
+  const total = activeHoldings.reduce((s, h) => s + valueForAllocation(h), 0) + cash;
 
   const classMap = new Map<string, number>();
   const posMap = new Map<string, number>();
@@ -402,8 +440,9 @@ export function computeAllocation(
 
   if (cash > 0) classMap.set("cash", cash);
 
-  for (const h of pricedHoldings) {
-    const mv = h.marketValue || 0;
+  for (const h of activeHoldings) {
+    const mv = valueForAllocation(h);
+    if (mv <= 0) continue;
     const cls = h.asset_class || (h.type === "crypto" ? "crypto" : h.type === "etf" ? "equity" : "other");
     classMap.set(cls, (classMap.get(cls) || 0) + mv);
     posMap.set(h.ticker, (posMap.get(h.ticker) || 0) + mv);

@@ -26,7 +26,7 @@ export default async function TransactionsPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Transazioni</h1>
         <Link
-          href="/dashboard/transactions/import"
+          href="/transactions/import"
           className="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg transition-colors"
         >
           Importa CSV

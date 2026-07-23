@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { Sidebar } from "../dashboard/sidebar";
+import { Sidebar } from "../(dashboard)/sidebar";
 
 export default async function ChatLayout({
   children,

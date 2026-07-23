@@ -265,6 +265,109 @@
         }
       }
     },
+    "/asset-analytics": {
+      "get": {
+        "operationId": "getAssetAnalytics",
+        "summary": "Scheda analitica per asset (prezzo, variazioni, PnL, XIRR)",
+        "description": "Per ogni posizione: prezzo attuale, variazioni % a 1/7/30 giorni (da Yahoo Finance per ETF in valuta nativa, da CoinGecko per crypto in EUR), costo medio, P&L, peso % e XIRR per singolo asset.",
+        "parameters": [
+          {
+            "name": "refresh",
+            "in": "query",
+            "description": "Imposta a 1 per forzare l'aggiornamento dei prezzi ignorando la cache.",
+            "required": false,
+            "schema": { "type": "string", "enum": ["1"] }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Analisi per asset",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "assets": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "ticker": { "type": "string" },
+                          "name": { "type": "string", "nullable": true },
+                          "type": { "type": "string" },
+                          "asset_class": { "type": "string", "nullable": true },
+                          "quantity": { "type": "number" },
+                          "avg_cost": { "type": "number" },
+                          "total_cost": { "type": "number" },
+                          "current_price": { "type": "number", "nullable": true },
+                          "market_value": { "type": "number", "nullable": true },
+                          "pnl": { "type": "number", "nullable": true },
+                          "pnl_pct": { "type": "number", "nullable": true },
+                          "weight_pct": { "type": "number", "nullable": true },
+                          "contribution_pct": { "type": "number", "nullable": true },
+                          "xirr_pct": { "type": "number", "nullable": true },
+                          "change_1d_pct": { "type": "number", "nullable": true },
+                          "change_7d_pct": { "type": "number", "nullable": true },
+                          "change_30d_pct": { "type": "number", "nullable": true },
+                          "drawdown_pct": { "type": "number", "nullable": true },
+                          "volatility_pct": { "type": "number", "nullable": true },
+                          "history_days": { "type": "integer" },
+                          "priced": { "type": "boolean" }
+                        }
+                      }
+                    },
+                    "total_market_value": { "type": "number" },
+                    "total_cost": { "type": "number" },
+                    "total_pnl": { "type": "number" },
+                    "unpriced": { "type": "array", "items": { "type": "string" } },
+                    "portfolio_drawdown_pct": { "type": "number", "nullable": true },
+                    "portfolio_volatility_pct": { "type": "number", "nullable": true },
+                    "portfolio_history_days": { "type": "integer" },
+                    "note": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/alerts": {
+      "get": {
+        "operationId": "getAlerts",
+        "summary": "Alert su soglie di prezzo, prezzi non aggiornati e deviazione allocazione",
+        "description": "Elenco degli alert attivi: soglie di prezzo superate/scese sotto per asset (configurabili nella pagina Asset), asset con prezzo non aggiornato da oltre 3 giorni, e deviazione dell'allocazione reale rispetto ai target configurati in Impostazioni > Allocazione target (se presenti).",
+        "responses": {
+          "200": {
+            "description": "Alert attivi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "alerts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": { "type": "string", "enum": ["price_above", "price_below", "allocation_deviation", "stale_price"] },
+                          "severity": { "type": "string", "enum": ["warning", "info"] },
+                          "message": { "type": "string" }
+                        }
+                      }
+                    },
+                    "count": { "type": "integer" },
+                    "note": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
     "/allocation": {
       "get": {
         "operationId": "getAllocation",

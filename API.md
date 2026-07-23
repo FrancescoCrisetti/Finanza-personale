@@ -165,6 +165,38 @@ Posizioni con valore di mercato attuale, costo medio, P&L e peso %. Prezzi: Coin
 
 ---
 
+### GET /api/v1/asset-analytics
+
+Scheda analitica per ogni posizione: prezzo, variazioni % 1g/7g/30g, PnL, peso e XIRR per singolo asset. Prezzi con cache 30 min, variazioni calcolate on-demand da Yahoo Finance (ETF) e CoinGecko (crypto). Usa `?refresh=1` per forzare l'aggiornamento dei prezzi.
+
+```json
+{
+  "assets": [
+    { "ticker": "string", "name": "string", "type": "etf|crypto", "asset_class": "string|null",
+      "quantity": "number", "avg_cost": "number", "total_cost": "number",
+      "current_price": "number|null", "market_value": "number|null",
+      "pnl": "number|null", "pnl_pct": "number|null", "weight_pct": "number|null",
+      "contribution_pct": "number|null",
+      "xirr_pct": "number|null",
+      "change_1d_pct": "number|null", "change_7d_pct": "number|null", "change_30d_pct": "number|null",
+      "drawdown_pct": "number|null", "volatility_pct": "number|null", "history_days": "number",
+      "priced": "boolean" }
+  ],
+  "total_market_value": "number",
+  "total_cost": "number",
+  "total_pnl": "number",
+  "unpriced": ["string"],
+  "portfolio_drawdown_pct": "number|null",
+  "portfolio_volatility_pct": "number|null",
+  "portfolio_history_days": "number",
+  "note": "string"
+}
+```
+
+Nota: per gli ETF le variazioni % sono calcolate in valuta nativa dello strumento (senza rifare la conversione FX storica giorno per giorno). `drawdown_pct`/`volatility_pct` si basano sullo storico salvato in `asset_price_history` e migliorano progressivamente con l'uso dell'app. Le metriche di portafoglio sono una stima (quantità attuali applicate allo storico prezzi disponibile, senza liquidità).
+
+---
+
 ### GET /api/v1/allocation
 
 Asset allocation per classe, posizione e (se taggati) area geografica e settore. Include il cash. `?refresh=1` per aggiornare i prezzi.
@@ -238,6 +270,20 @@ Plus/minusvalenze realizzate per anno (metodo costo medio), dividendi e zainetto
 
 ---
 
+### GET /api/v1/alerts
+
+Alert attivi sul portafoglio: soglie di prezzo per asset (configurabili nella pagina Asset), asset con prezzo non aggiornato da oltre 3 giorni, e deviazione dell'allocazione reale rispetto ai target configurati in Impostazioni > Allocazione target (se presenti).
+
+```json
+{
+  "alerts": [{ "type": "price_above|price_below|allocation_deviation|stale_price", "severity": "warning|info", "message": "string" }],
+  "count": "number",
+  "note": "string"
+}
+```
+
+---
+
 ## Errors
 
 ```json
@@ -260,5 +306,6 @@ Plus/minusvalenze realizzate per anno (metodo costo medio), dividendi e zainetto
 5. **Cash flow** → call `/cashflow` for income/expenses and savings rate
 6. **Tax** → call `/tax` for realized gains/losses and tax shield
 7. **Deep dive** → call `/transactions` with filters for granular detail
+8. **Alerts** → call `/alerts` for price threshold breaches, stale prices, and allocation drift
 
 Use Python `urllib.request` to make calls. Pass the token via `Authorization: Bearer <token>` header.

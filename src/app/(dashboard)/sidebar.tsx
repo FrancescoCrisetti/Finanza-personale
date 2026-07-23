@@ -24,7 +24,7 @@ const NAV_ITEMS = [
     ),
   },
   {
-    href: "/dashboard/transactions",
+    href: "/transactions",
     label: "Transazioni",
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -33,7 +33,7 @@ const NAV_ITEMS = [
     ),
   },
   {
-    href: "/dashboard/accounts",
+    href: "/accounts",
     label: "Conti",
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -42,11 +42,20 @@ const NAV_ITEMS = [
     ),
   },
   {
-    href: "/dashboard/assets",
+    href: "/assets",
     label: "Asset",
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125v-3.75" />
+      </svg>
+    ),
+  },
+  {
+    href: "/investments",
+    label: "Investimenti",
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 3v18h18M7 14l4-4 3 3 5-6" />
       </svg>
     ),
   },
@@ -111,9 +120,9 @@ export function Sidebar({ email }: { email: string }) {
       {/* Footer */}
       <div className="border-t border-gray-100 p-2 space-y-1">
         <Link
-          href="/dashboard/settings"
+          href="/settings"
           className={`flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm transition-colors ${
-            pathname.startsWith("/dashboard/settings")
+            pathname.startsWith("/settings")
               ? "bg-gray-100 text-black font-medium"
               : "text-gray-600 hover:bg-gray-50 hover:text-black"
           }`}

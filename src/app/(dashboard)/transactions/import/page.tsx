@@ -36,6 +36,17 @@ interface UnifiedTx {
   raw_json: any;
 }
 
+interface ExistingTxRow {
+  external_id: string | null;
+  date: string;
+  type: string;
+  account_id: string;
+  asset_id: string | null;
+  quantity: number | null;
+  unit_price_eur: number | null;
+  amount_eur: number;
+}
+
 export default function ImportCSVPage() {
   const router = useRouter();
   const [mode, setMode] = useState<ImportMode>("binance");
@@ -43,6 +54,42 @@ export default function ImportCSVPage() {
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState("");
   const [fileName, setFileName] = useState("");
+
+  const normalizeNum = (value: unknown, decimals = 8): string => {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return "";
+    return num.toFixed(decimals);
+  };
+
+  const normalizeDateForFingerprint = (date: string): string => {
+    const [year = "", month = "", day = ""] = date.split("-");
+
+    if (year.length === 6 && year.startsWith("20")) {
+      return `${year.slice(2)}-${month}-${day}`;
+    }
+
+    return date;
+  };
+
+  const txFingerprint = (tx: {
+    date: string;
+    type: string;
+    account_id: string;
+    asset_id: string | null;
+    quantity: number | null;
+    unit_price_eur: number | null;
+    amount_eur: number;
+  }): string => {
+    return [
+    normalizeDateForFingerprint(tx.date),
+      tx.type,
+      tx.account_id,
+      tx.asset_id || "",
+      normalizeNum(tx.quantity, 8),
+      normalizeNum(tx.unit_price_eur, 6),
+      normalizeNum(tx.amount_eur, 4),
+    ].join("|");
+  };
 
   function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -185,12 +232,67 @@ export default function ImportCSVPage() {
         };
       });
 
+    if (toInsert.length === 0) {
+      setResult("Nessuna transazione valida da importare.");
+      setImporting(false);
+      return;
+    }
+
+    // Fetch existing transactions for the same account to block legacy duplicates
+    // (e.g. old rows with different source, missing external_id, or malformed dates).
+    const existingRows: ExistingTxRow[] = [];
+    let offset = 0;
+    const pageSize = 1000;
+
+    while (true) {
+      const { data: page, error } = await supabase
+        .from("transactions")
+        .select("external_id,date,type,account_id,asset_id,quantity,unit_price_eur,amount_eur")
+        .eq("account_id", account.id)
+        .range(offset, offset + pageSize - 1);
+
+      if (error) {
+        console.error("Existing transactions fetch error:", error.message);
+        break;
+      }
+
+      if (!page || page.length === 0) break;
+
+      existingRows.push(...(page as ExistingTxRow[]));
+
+      if (page.length < pageSize) break;
+      offset += pageSize;
+    }
+
+    const existingExternalIds = new Set(
+      existingRows
+        .map((r) => r.external_id)
+        .filter((v): v is string => Boolean(v))
+    );
+    const existingFingerprints = new Set(existingRows.map((r) => txFingerprint(r)));
+
+    let skippedExisting = 0;
+    const dedupedToInsert = toInsert.filter((tx) => {
+      if (tx.external_id && existingExternalIds.has(tx.external_id)) {
+        skippedExisting += 1;
+        return false;
+      }
+
+      const fp = txFingerprint(tx);
+      if (existingFingerprints.has(fp)) {
+        skippedExisting += 1;
+        return false;
+      }
+
+      return true;
+    });
+
     let inserted = 0;
-    let skipped = 0;
+    let skippedConflict = 0;
     const batchSize = 50;
 
-    for (let i = 0; i < toInsert.length; i += batchSize) {
-      const batch = toInsert.slice(i, i + batchSize);
+    for (let i = 0; i < dedupedToInsert.length; i += batchSize) {
+      const batch = dedupedToInsert.slice(i, i + batchSize);
       const { data, error } = await supabase
         .from("transactions")
         .upsert(batch, { onConflict: "user_id,source,external_id", ignoreDuplicates: true })
@@ -199,16 +301,18 @@ export default function ImportCSVPage() {
         console.error("Batch error:", error.message);
       } else {
         inserted += data?.length || 0;
-        skipped += batch.length - (data?.length || 0);
+        skippedConflict += batch.length - (data?.length || 0);
       }
     }
+
+    const skipped = skippedExisting + skippedConflict;
 
     const parts = [`${inserted} nuove transazioni importate`];
     if (skipped > 0) parts.push(`${skipped} già presenti (saltate)`);
     setResult(parts.join(". ") + ".");
 
     if (inserted > 0) {
-      setTimeout(() => router.push("/dashboard/transactions"), 2000);
+      setTimeout(() => router.push("/transactions"), 2000);
     }
     setImporting(false);
   }
