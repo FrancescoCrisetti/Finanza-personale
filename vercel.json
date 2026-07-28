@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/v1/cron/snapshot-networth",
+      "schedule": "0 23 * * *"
+    }
+  ]
+}

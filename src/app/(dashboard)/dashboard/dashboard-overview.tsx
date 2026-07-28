@@ -7,10 +7,12 @@ import {
   computeAllocation,
   computeCashflow,
   computePortfolioXirr,
+  round,
 } from "@/lib/analytics";
 import { getAlerts } from "@/lib/alerts";
 import { AllocationChart } from "./allocation-chart";
 import { CashflowChart } from "./cashflow-chart";
+import { NetWorthChart } from "./net-worth-chart";
 
 function eur(n: number): string {
   return n.toLocaleString("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
@@ -75,6 +77,39 @@ export async function DashboardOverview({ userId }: { userId: string }) {
   const allocation = computeAllocation(enriched, totalCash);
   const cashflowMonthly = computeCashflow(transactions).monthly.slice(-6);
 
+  // Storico patrimonio netto: normalmente popolato dal cron giornaliero
+  // (/api/v1/cron/snapshot-networth). Se manca lo snapshot di oggi (es. cron
+  // non ancora eseguito o non configurato) lo creiamo qui come rete di
+  // sicurezza, riusando i valori già calcolati sopra.
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const since = new Date();
+  since.setDate(since.getDate() - 180);
+  const { data: snapshotRows } = await supabase
+    .from("net_worth_snapshots")
+    .select("date, net_worth")
+    .eq("user_id", userId)
+    .gte("date", since.toISOString().slice(0, 10))
+    .order("date", { ascending: true });
+
+  const netWorthHistory = (snapshotRows as Array<{ date: string; net_worth: number }> | null) || [];
+
+  if (!netWorthHistory.some((s) => s.date === todayStr)) {
+    await supabase.from("net_worth_snapshots").upsert(
+      {
+        user_id: userId,
+        date: todayStr,
+        net_worth: round(netWorth),
+        total_assets: round(portfolioValue + externalTotal),
+        total_liabilities: round(liabilitiesTotal),
+        invested_market_value: round(totalMarketValue),
+        cash: round(totalCash),
+        external_assets: round(externalTotal),
+      },
+      { onConflict: "user_id,date" }
+    );
+    netWorthHistory.push({ date: todayStr, net_worth: round(netWorth) });
+  }
+
   const cards = [
     { label: "Patrimonio netto", value: eur(netWorth), sub: liabilitiesTotal > 0 ? `incl. -${eur(liabilitiesTotal)} debiti` : "" },
     { label: "Valore portafoglio", value: eur(portfolioValue), sub: `${eur(totalMarketValue)} investito + ${eur(totalCash)} cash` },
@@ -121,10 +156,21 @@ export async function DashboardOverview({ userId }: { userId: string }) {
         ))}
       </div>
 
+      {netWorthHistory.length > 1 && (
+        <div className="bg-white rounded-lg border p-4">
+          <div className="text-sm font-semibold mb-3">Andamento patrimonio netto</div>
+          <NetWorthChart
+            data={netWorthHistory.map((s) => ({
+              date: new Date(s.date).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" }),
+              net_worth: Number(s.net_worth),
+            }))}
+          />
+        </div>
+      )}
+
       {allocation.byClass.length > 0 && (
         <div className="bg-white rounded-lg border p-4">
-          <div className="text-sm font-semibold mb-3">Allocazione per classe</div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+          <div className="text-sm font-semibold mb-3">Allocazione per classe</div>          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
             <AllocationChart
               slices={allocation.byClass.map((s) => ({
                 key: s.key,

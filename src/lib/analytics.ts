@@ -467,3 +467,45 @@ export function round(n: number, dp = 2): number {
   const f = Math.pow(10, dp);
   return Math.round(n * f) / f;
 }
+
+// ── Snapshot patrimonio netto (usato dal cron giornaliero e dal fallback lazy) ──
+export interface NetWorthSnapshot {
+  netWorth: number;
+  totalAssets: number;
+  totalLiabilities: number;
+  investedMarketValue: number;
+  cash: number;
+  externalAssets: number;
+}
+
+export async function computeNetWorthSnapshot(
+  supabase: SupabaseService,
+  userId: string
+): Promise<NetWorthSnapshot> {
+  const [transactions, { data: liabilities }, { data: externalAssetsRows }] = await Promise.all([
+    fetchAllTransactions(supabase, userId),
+    supabase.from("liabilities").select("amount_eur").eq("user_id", userId),
+    supabase.from("external_assets").select("value_eur").eq("user_id", userId),
+  ]);
+
+  const { holdings } = computeHoldingsAndRealized(transactions);
+  const { totalMarketValue } = await enrichHoldingsWithPrices(supabase, userId, holdings);
+
+  const cashByAccount = computeCashByAccount(transactions);
+  const cash = Object.values(cashByAccount).reduce((s, v) => s + v, 0);
+
+  const externalAssets = (externalAssetsRows || []).reduce((s, e) => s + Number(e.value_eur), 0);
+  const totalLiabilities = (liabilities || []).reduce((s, l) => s + Number(l.amount_eur), 0);
+
+  const totalAssets = totalMarketValue + cash + externalAssets;
+  const netWorth = totalAssets - totalLiabilities;
+
+  return {
+    netWorth: round(netWorth),
+    totalAssets: round(totalAssets),
+    totalLiabilities: round(totalLiabilities),
+    investedMarketValue: round(totalMarketValue),
+    cash: round(cash),
+    externalAssets: round(externalAssets),
+  };
+}
